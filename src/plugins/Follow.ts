@@ -26,12 +26,27 @@ export interface IFollowOptions
      * @default null
      */
     radius?: number | null;
+
+    /**
+     * Sets the offset from the target position on the x axis
+     * @default 0
+     */
+    offsetX?: number;
+
+    /**
+     * Sets the offset from the target position on the y axis
+     * @default 0
+     */
+    offsetY?: number;
+
 }
 
 const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
     speed: 0,
     acceleration: null,
-    radius: null
+    radius: null,
+    offsetX: 0,
+    offsetY: 0,
 };
 
 /**
@@ -75,8 +90,8 @@ export class Follow extends Plugin
         }
 
         const center = this.parent.center;
-        let toX = this.target.x;
-        let toY = this.target.y;
+        let toX = this.target.x + this.options.offsetX;
+        let toY = this.target.y + this.options.offsetY;
 
         if (this.options.radius)
         {
