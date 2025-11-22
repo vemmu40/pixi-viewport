@@ -28,16 +28,11 @@ export interface IFollowOptions
     radius?: number | null;
 
     /**
-     * Sets the offset from the target position on the x axis
-     * @default 0
+     * Screen position (canvas coordinates) to use instead of viewport center
+     * If provided, this position will be converted to world coordinates
+     * @default null
      */
-    offsetX?: number;
-
-    /**
-     * Sets the offset from the target position on the y axis
-     * @default 0
-     */
-    offsetY?: number;
+    position?: PointData | null;
 
 }
 
@@ -45,8 +40,7 @@ const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
     speed: 0,
     acceleration: null,
     radius: null,
-    offsetX: 0,
-    offsetY: 0,
+    position: null,
 };
 
 /**
@@ -89,9 +83,12 @@ export class Follow extends Plugin
             return;
         }
 
-        const center = this.parent.center;
-        let toX = this.target.x + this.options.offsetX;
-        let toY = this.target.y + this.options.offsetY;
+        // Use provided position (converted to world coordinates) or viewport center
+        const center = this.options.position
+            ? this.parent.toWorld(this.options.position)
+            : this.parent.center;
+        let toX = this.target.x;
+        let toY = this.target.y;
 
         if (this.options.radius)
         {
