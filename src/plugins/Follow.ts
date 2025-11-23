@@ -28,16 +28,12 @@ export interface IFollowOptions
     radius?: number | null;
 
     /**
-     * Sets the offset from the target position on the x axis
-     * @default 0
+     * Follow point in canvas coordinates. If not provided, defaults to viewport center.
+     * Will be converted to world coordinates internally.
+     *
+     * @default null
      */
-    offsetX?: number;
-
-    /**
-     * Sets the offset from the target position on the y axis
-     * @default 0
-     */
-    offsetY?: number;
+    followPoint?: PointData | null;
 
 }
 
@@ -45,8 +41,7 @@ const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
     speed: 0,
     acceleration: null,
     radius: null,
-    offsetX: 0,
-    offsetY: 0,
+    followPoint: null,
 };
 
 /**
@@ -90,10 +85,9 @@ export class Follow extends Plugin
         }
 
         // Use provided position (converted to world coordinates) or viewport center
-        const center = this.parent.center;
-
-        center.x += this.options.offsetX;
-        center.y += this.options.offsetY;
+        const center = this.options.followPoint
+            ? this.parent.toWorld(this.options.followPoint)
+            : this.parent.center;
 
         let toX = this.target.x;
         let toY = this.target.y;
@@ -173,5 +167,23 @@ export class Follow extends Plugin
                 this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
             }
         }
+    }
+
+    /**
+     * Set the follow point in canvas coordinates.
+     * @param point - Canvas coordinates to follow, or null to use viewport center
+     */
+    public setFollowPoint(point: PointData | null): void
+    {
+        (this.options as any).followPoint = point;
+    }
+
+    /**
+     * Get the current follow point in canvas coordinates.
+     * @returns The current follow point or null if using viewport center
+     */
+    public getFollowPoint(): PointData | null
+    {
+        return this.options.followPoint;
     }
 }
