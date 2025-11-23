@@ -29,11 +29,10 @@ export interface IFollowOptions
 
     /**
      * Offset from target position to follow
-     *
-     * @default {x:0, y:0}
+     * @default { x: 0, y: 0 }
      */
-    offset?: PointData;
 
+    offset?: PointData;
 }
 
 const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
@@ -76,17 +75,6 @@ export class Follow extends Plugin
         this.velocity = { x: 0, y: 0 };
     }
 
-    /**
-     * Set the offset from the target position to follow.
-     *
-     * @param offset - The offset in screen coordinates (pixels from top-left of canvas)
-     */
-    public setOffset(offset: PointData): void
-    {
-        this.options.offset.x = offset.x;
-        this.options.offset.y = offset.y;
-    }
-
     public update(elapsed: number): void
     {
         if (this.paused)
@@ -94,23 +82,15 @@ export class Follow extends Plugin
             return;
         }
 
-        // Convert screen offset to world coordinates
-        const worldOffset = this.parent.toWorld(this.options.offset);
-        const worldCenter = this.parent.toWorld({ x: 0, y: 0 });
-        const optionsOffset = {
-            x: worldOffset.x - worldCenter.x,
-            y: worldOffset.y - worldCenter.y
-        };
-
         const center = this.parent.center;
-        let toX = this.target.x + optionsOffset.x;
-        let toY = this.target.y + optionsOffset.y;
+        let toX = this.target.x + (this.options.offset.x / this.parent.scale.x);
+        let toY = this.target.y + (this.options.offset.y / this.parent.scale.y);
 
         if (this.options.radius)
         {
             const targetWithOffset = {
-                x: this.target.x + optionsOffset.x,
-                y: this.target.y + optionsOffset.y
+                x: this.target.x + (this.options.offset.x / this.parent.scale.x),
+                y: this.target.y + (this.options.offset.y / this.parent.scale.y)
             };
             const distance = Math.sqrt(
                 Math.pow(targetWithOffset.y - center.y, 2) + Math.pow(targetWithOffset.x - center.x, 2)
@@ -187,5 +167,10 @@ export class Follow extends Plugin
                 this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
             }
         }
+    }
+
+    public setOffset(offset: PointData)
+    {
+        this.options.offset = offset;
     }
 }
