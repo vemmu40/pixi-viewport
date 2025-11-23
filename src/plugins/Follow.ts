@@ -1,7 +1,7 @@
-import { Viewport } from '../Viewport';
 import { Plugin } from './Plugin';
 
 import type { Container, PointData } from 'pixi.js';
+import type { Viewport } from '../Viewport';
 
 /** Options for {@link Follow}. */
 export interface IFollowOptions
@@ -28,20 +28,19 @@ export interface IFollowOptions
     radius?: number | null;
 
     /**
-     * Follow point in canvas coordinates. If not provided, defaults to viewport center.
-     * Will be converted to world coordinates internally.
+     * Offset from target position to follow
      *
-     * @default null
+     * @default {x:0, y:0}
      */
-    followPoint?: PointData;
+    offset?: PointData;
 
 }
 
 const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
     speed: 0,
     acceleration: null,
-    radius: 0,
-    followPoint: { x: 0, y: 0 },
+    radius: null,
+    offset: { x: 400, y: 0 }
 };
 
 /**
@@ -77,6 +76,17 @@ export class Follow extends Plugin
         this.velocity = { x: 0, y: 0 };
     }
 
+    /**
+     * Set the offset from the target position to follow.
+     *
+     * @param offset - The offset in screen coordinates (pixels from top-left of canvas)
+     */
+    public setOffset(offset: PointData): void
+    {
+        this.options.offset.x = offset.x;
+        this.options.offset.y = offset.y;
+    }
+
     public update(elapsed: number): void
     {
         if (this.paused)
@@ -84,25 +94,34 @@ export class Follow extends Plugin
             return;
         }
 
-        // Convert follow point from canvas coordinates to world coordinates
-        const followPointWorld = this.parent.toWorld(this.options.followPoint
-            ?? { x: this.parent.center.x, y: this.parent.center.y });
+        // Convert screen offset to world coordinates
+        const worldOffset = this.parent.toWorld(this.options.offset);
+        const worldCenter = this.parent.toWorld({ x: 0, y: 0 });
+        const optionsOffset = {
+            x: worldOffset.x - worldCenter.x,
+            y: worldOffset.y - worldCenter.y
+        };
 
-        let toX = this.target.x;
-        let toY = this.target.y;
+        const center = this.parent.center;
+        let toX = this.target.x + optionsOffset.x;
+        let toY = this.target.y + optionsOffset.y;
 
         if (this.options.radius)
         {
+            const targetWithOffset = {
+                x: this.target.x + optionsOffset.x,
+                y: this.target.y + optionsOffset.y
+            };
             const distance = Math.sqrt(
-                Math.pow(this.target.y - followPointWorld.y, 2) + Math.pow(this.target.x - followPointWorld.x, 2)
+                Math.pow(targetWithOffset.y - center.y, 2) + Math.pow(targetWithOffset.x - center.x, 2)
             );
 
             if (distance > this.options.radius)
             {
-                const angle = Math.atan2(this.target.y - followPointWorld.y, this.target.x - followPointWorld.x);
+                const angle = Math.atan2(targetWithOffset.y - center.y, targetWithOffset.x - center.x);
 
-                toX = this.target.x - (Math.cos(angle) * this.options.radius);
-                toY = this.target.y - (Math.sin(angle) * this.options.radius);
+                toX = targetWithOffset.x - (Math.cos(angle) * this.options.radius);
+                toY = targetWithOffset.y - (Math.sin(angle) * this.options.radius);
             }
             else
             {
@@ -110,16 +129,8 @@ export class Follow extends Plugin
             }
         }
 
-        // Calculate offset from follow point (world coords) to viewport center
-        const offsetX = followPointWorld.x - this.parent.center.x;
-        const offsetY = followPointWorld.y - this.parent.center.y;
-
-        // Calculate where viewport center should be to put target at follow point
-        const targetCenterX = toX - offsetX;
-        const targetCenterY = toY - offsetY;
-
-        const deltaX = targetCenterX - this.parent.center.x;
-        const deltaY = targetCenterY - this.parent.center.y;
+        const deltaX = toX - center.x;
+        const deltaY = toY - center.y;
 
         if (deltaX || deltaY)
         {
@@ -127,7 +138,7 @@ export class Follow extends Plugin
             {
                 if (this.options.acceleration)
                 {
-                    const angle = Math.atan2(deltaY, deltaX);
+                    const angle = Math.atan2(toY - center.y, toX - center.x);
                     const distance = Math.sqrt(Math.pow(deltaX, 2) + Math.pow(deltaY, 2));
 
                     if (distance)
@@ -138,21 +149,21 @@ export class Follow extends Plugin
                         if (distance > decelerationDistance)
                         {
                             this.velocity = {
-                                x: Math.min(this.velocity.x + (this.options.acceleration * elapsed), this.options.speed),
-                                y: Math.min(this.velocity.y + (this.options.acceleration * elapsed), this.options.speed)
+                                x: Math.min(this.velocity.x + (this.options.acceleration * elapsed, this.options.speed)),
+                                y: Math.min(this.velocity.y + (this.options.acceleration * elapsed, this.options.speed))
                             };
                         }
                         else
                         {
                             this.velocity = {
-                                x: Math.max(this.velocity.x - (this.options.acceleration * elapsed), 0),
-                                y: Math.max(this.velocity.y - (this.options.acceleration * elapsed), 0)
+                                x: Math.max(this.velocity.x - (this.options.acceleration * this.options.speed), 0),
+                                y: Math.max(this.velocity.y - (this.options.acceleration * this.options.speed), 0)
                             };
                         }
                         const changeX = Math.cos(angle) * this.velocity.x;
                         const changeY = Math.sin(angle) * this.velocity.y;
-                        const x = Math.abs(changeX) > Math.abs(deltaX) ? targetCenterX : this.parent.center.x + changeX;
-                        const y = Math.abs(changeY) > Math.abs(deltaY) ? targetCenterY : this.parent.center.y + changeY;
+                        const x = Math.abs(changeX) > Math.abs(deltaX) ? toX : center.x + changeX;
+                        const y = Math.abs(changeY) > Math.abs(deltaY) ? toY : center.y + changeY;
 
                         this.parent.moveCenter(x, y);
                         this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
@@ -160,11 +171,11 @@ export class Follow extends Plugin
                 }
                 else
                 {
-                    const angle = Math.atan2(deltaY, deltaX);
+                    const angle = Math.atan2(toY - center.y, toX - center.x);
                     const changeX = Math.cos(angle) * this.options.speed;
                     const changeY = Math.sin(angle) * this.options.speed;
-                    const x = Math.abs(changeX) > Math.abs(deltaX) ? targetCenterX : this.parent.center.x + changeX;
-                    const y = Math.abs(changeY) > Math.abs(deltaY) ? targetCenterY : this.parent.center.y + changeY;
+                    const x = Math.abs(changeX) > Math.abs(deltaX) ? toX : center.x + changeX;
+                    const y = Math.abs(changeY) > Math.abs(deltaY) ? toY : center.y + changeY;
 
                     this.parent.moveCenter(x, y);
                     this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
@@ -172,27 +183,9 @@ export class Follow extends Plugin
             }
             else
             {
-                this.parent.moveCenter(targetCenterX, targetCenterY);
+                this.parent.moveCenter(toX, toY);
                 this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
             }
         }
-    }
-
-    /**
-     * Set the follow point in canvas coordinates.
-     * @param point - Canvas coordinates to follow, or null to use viewport center
-     */
-    public setFollowPoint(point: PointData | null): void
-    {
-        (this.options as any).followPoint = point;
-    }
-
-    /**
-     * Get the current follow point in canvas coordinates.
-     * @returns The current follow point or null if using viewport center
-     */
-    public getFollowPoint(): PointData | null
-    {
-        return this.options.followPoint;
     }
 }
