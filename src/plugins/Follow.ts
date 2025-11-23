@@ -1,7 +1,7 @@
+import { Viewport } from '../Viewport';
 import { Plugin } from './Plugin';
 
 import type { Container, PointData } from 'pixi.js';
-import type { Viewport } from '../Viewport';
 
 /** Options for {@link Follow}. */
 export interface IFollowOptions
@@ -33,15 +33,15 @@ export interface IFollowOptions
      *
      * @default null
      */
-    followPoint?: PointData | null;
+    followPoint?: PointData;
 
 }
 
 const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
     speed: 0,
     acceleration: null,
-    radius: null,
-    followPoint: null,
+    radius: 0,
+    followPoint: { x: 0, y: 0 },
 };
 
 /**
@@ -84,21 +84,22 @@ export class Follow extends Plugin
             return;
         }
 
-        // Use provided position (converted to world coordinates) or viewport center
-        const center = this.options.followPoint
-            ? this.parent.toWorld(this.options.followPoint)
-            : this.parent.center;
+        // Convert follow point from canvas coordinates to world coordinates
+        const followPointWorld = this.parent.toWorld(this.options.followPoint
+            ?? { x: this.parent.center.x, y: this.parent.center.y });
 
         let toX = this.target.x;
         let toY = this.target.y;
 
         if (this.options.radius)
         {
-            const distance = Math.sqrt(Math.pow(this.target.y - center.y, 2) + Math.pow(this.target.x - center.x, 2));
+            const distance = Math.sqrt(
+                Math.pow(this.target.y - followPointWorld.y, 2) + Math.pow(this.target.x - followPointWorld.x, 2)
+            );
 
             if (distance > this.options.radius)
             {
-                const angle = Math.atan2(this.target.y - center.y, this.target.x - center.x);
+                const angle = Math.atan2(this.target.y - followPointWorld.y, this.target.x - followPointWorld.x);
 
                 toX = this.target.x - (Math.cos(angle) * this.options.radius);
                 toY = this.target.y - (Math.sin(angle) * this.options.radius);
@@ -109,8 +110,16 @@ export class Follow extends Plugin
             }
         }
 
-        const deltaX = toX - center.x;
-        const deltaY = toY - center.y;
+        // Calculate offset from follow point (world coords) to viewport center
+        const offsetX = followPointWorld.x - this.parent.center.x;
+        const offsetY = followPointWorld.y - this.parent.center.y;
+
+        // Calculate where viewport center should be to put target at follow point
+        const targetCenterX = toX - offsetX;
+        const targetCenterY = toY - offsetY;
+
+        const deltaX = targetCenterX - this.parent.center.x;
+        const deltaY = targetCenterY - this.parent.center.y;
 
         if (deltaX || deltaY)
         {
@@ -118,7 +127,7 @@ export class Follow extends Plugin
             {
                 if (this.options.acceleration)
                 {
-                    const angle = Math.atan2(toY - center.y, toX - center.x);
+                    const angle = Math.atan2(deltaY, deltaX);
                     const distance = Math.sqrt(Math.pow(deltaX, 2) + Math.pow(deltaY, 2));
 
                     if (distance)
@@ -129,21 +138,21 @@ export class Follow extends Plugin
                         if (distance > decelerationDistance)
                         {
                             this.velocity = {
-                                x: Math.min(this.velocity.x + (this.options.acceleration * elapsed, this.options.speed)),
-                                y: Math.min(this.velocity.y + (this.options.acceleration * elapsed, this.options.speed))
+                                x: Math.min(this.velocity.x + (this.options.acceleration * elapsed), this.options.speed),
+                                y: Math.min(this.velocity.y + (this.options.acceleration * elapsed), this.options.speed)
                             };
                         }
                         else
                         {
                             this.velocity = {
-                                x: Math.max(this.velocity.x - (this.options.acceleration * this.options.speed), 0),
-                                y: Math.max(this.velocity.y - (this.options.acceleration * this.options.speed), 0)
+                                x: Math.max(this.velocity.x - (this.options.acceleration * elapsed), 0),
+                                y: Math.max(this.velocity.y - (this.options.acceleration * elapsed), 0)
                             };
                         }
                         const changeX = Math.cos(angle) * this.velocity.x;
                         const changeY = Math.sin(angle) * this.velocity.y;
-                        const x = Math.abs(changeX) > Math.abs(deltaX) ? toX : center.x + changeX;
-                        const y = Math.abs(changeY) > Math.abs(deltaY) ? toY : center.y + changeY;
+                        const x = Math.abs(changeX) > Math.abs(deltaX) ? targetCenterX : this.parent.center.x + changeX;
+                        const y = Math.abs(changeY) > Math.abs(deltaY) ? targetCenterY : this.parent.center.y + changeY;
 
                         this.parent.moveCenter(x, y);
                         this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
@@ -151,11 +160,11 @@ export class Follow extends Plugin
                 }
                 else
                 {
-                    const angle = Math.atan2(toY - center.y, toX - center.x);
+                    const angle = Math.atan2(deltaY, deltaX);
                     const changeX = Math.cos(angle) * this.options.speed;
                     const changeY = Math.sin(angle) * this.options.speed;
-                    const x = Math.abs(changeX) > Math.abs(deltaX) ? toX : center.x + changeX;
-                    const y = Math.abs(changeY) > Math.abs(deltaY) ? toY : center.y + changeY;
+                    const x = Math.abs(changeX) > Math.abs(deltaX) ? targetCenterX : this.parent.center.x + changeX;
+                    const y = Math.abs(changeY) > Math.abs(deltaY) ? targetCenterY : this.parent.center.y + changeY;
 
                     this.parent.moveCenter(x, y);
                     this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
@@ -163,7 +172,7 @@ export class Follow extends Plugin
             }
             else
             {
-                this.parent.moveCenter(toX, toY);
+                this.parent.moveCenter(targetCenterX, targetCenterY);
                 this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
             }
         }
