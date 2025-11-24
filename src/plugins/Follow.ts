@@ -71,6 +71,8 @@ export class Follow extends Plugin
 
         this.target = target;
         this.options = Object.assign({}, DEFAULT_FOLLOW_OPTIONS, options);
+        // Ensure offset is a separate object to prevent shared references with defaults
+        this.options.offset = { ...this.options.offset };
         this.velocity = { x: 0, y: 0 };
     }
 
