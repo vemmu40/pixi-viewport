@@ -38,7 +38,7 @@ const DEFAULT_FOLLOW_OPTIONS: Required<IFollowOptions> = {
     speed: 0,
     acceleration: null,
     radius: null,
-    offset: { x: 0, y: 0 }
+    offset: { x: 400, y: 0 }
 };
 
 /**
