@@ -28,10 +28,9 @@ export interface IFollowOptions
     radius?: number | null;
 
     /**
-     * Offset from target position to follow
-     * @default { x: 0, y: 0 }
-     */
-
+     * Offset in px from the center
+     * @default {x: 0, y: 0}
+    */
     offset?: PointData;
 }
 
@@ -83,25 +82,22 @@ export class Follow extends Plugin
         }
 
         const center = this.parent.center;
-        let toX = this.target.x + (this.options.offset.x / this.parent.scale.x);
-        let toY = this.target.y + (this.options.offset.y / this.parent.scale.y);
+        const offsetX = this.options.offset.x / this.parent.scale.x;
+        const offsetY = this.options.offset.y / this.parent.scale.y;
+
+        let toX = this.target.x + offsetX;
+        let toY = this.target.y + offsetY;
 
         if (this.options.radius)
         {
-            const targetWithOffset = {
-                x: this.target.x + (this.options.offset.x / this.parent.scale.x),
-                y: this.target.y + (this.options.offset.y / this.parent.scale.y)
-            };
-            const distance = Math.sqrt(
-                Math.pow(targetWithOffset.y - center.y, 2) + Math.pow(targetWithOffset.x - center.x, 2)
-            );
+            const distance = Math.sqrt(Math.pow(toY - center.y, 2) + Math.pow(toX - center.x, 2));
 
             if (distance > this.options.radius)
             {
-                const angle = Math.atan2(targetWithOffset.y - center.y, targetWithOffset.x - center.x);
+                const angle = Math.atan2(toY - center.y, toX - center.x);
 
-                toX = targetWithOffset.x - (Math.cos(angle) * this.options.radius);
-                toY = targetWithOffset.y - (Math.sin(angle) * this.options.radius);
+                toX -= Math.cos(angle) * this.options.radius;
+                toY -= Math.sin(angle) * this.options.radius;
             }
             else
             {
@@ -129,8 +125,8 @@ export class Follow extends Plugin
                         if (distance > decelerationDistance)
                         {
                             this.velocity = {
-                                x: Math.min(this.velocity.x + (this.options.acceleration * elapsed, this.options.speed)),
-                                y: Math.min(this.velocity.y + (this.options.acceleration * elapsed, this.options.speed))
+                                x: Math.min(this.velocity.x + (this.options.acceleration * elapsed), this.options.speed),
+                                y: Math.min(this.velocity.y + (this.options.acceleration * elapsed), this.options.speed)
                             };
                         }
                         else
@@ -167,10 +163,5 @@ export class Follow extends Plugin
                 this.parent.emit('moved', { viewport: this.parent, type: 'follow' });
             }
         }
-    }
-
-    public setOffset(offset: PointData)
-    {
-        this.options.offset = offset;
     }
 }
